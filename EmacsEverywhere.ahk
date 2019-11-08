@@ -13,6 +13,7 @@
 #NoEnv  ; Recommended for performance and compatibility with future AutoHotkey releases.
 SendMode Input  ; Recommended for new scripts due to its superior speed and reliability.
 SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
+SetCapsLockState, AlwaysOff ; diable the CapsLock key
 
 #InstallKeybdHook
 #UseHook
@@ -24,32 +25,48 @@ is_pre_x = 0
 ; C-Space status
 is_pre_spc = 0
 EmacsModeStat := false
-SetEmacsMode(false)
+SetEmacsMode(true)
+
 ;==========================
 ;Timer Subroutine
 ;==========================
 KeyX:
   SetTimer, KeyX, off
   global is_pre_x = 0
-  return 
+  return
+
+;==========================
+;Bind Caps to RCtrl
+;==========================
+CapsLock::RCtrl
 
 ;==========================
 ;Emacs mode toggle
 ;==========================
 ^`::
   SetEmacsMode(!EmacsModeStat)
+
 return
 
 SetEmacsMode(toActive) {
   local iconFile := toActive ? enabledIcon : disabledIcon
   local state := toActive ? "ON" : "OFF"
-  
+
   EmacsModeStat := toActive
   ;TrayTip, Emacs Everywhere, Emacs mode is %state%, 10, 1
   Menu, Tray, Icon, %iconFile%,
-  Menu, Tray, Tip, Emacs Everywhere`nEmacs mode is %state%  
-  
+  Menu, Tray, Tip, Emacs Everywhere`nEmacs mode is %state%
+
   Send {Shift Up}
+}
+
+
+;==========================
+; temp 
+;==========================
+>^<^!C::ToggleCapsLock()
+ToggleCapsLock() {
+SetCapsLockState, AlwaysOff ; diable the CapsLock key
 }
 
 ;==========================
@@ -57,20 +74,21 @@ SetEmacsMode(toActive) {
 ; WinActive("ahk_class Chrome_WidgetWin_1") ||
 ;==========================
 is_target() {
-  ; force enable 
-  if(WinActive("MATLAB R2014b ahk_class SunAwtFrame")) {
+  ; force on for rider and clion (ahk_class is SunAwtFrame)
+  if (WinActive("ahk_exe rider64.exe") || WinActive("ahk_exe clion64.exe")) {
     return true
   }
-  ; for disable 
-  if (WinActive("ahk_class Console_2_Main") || WinActive("ahk_class PuTTY") || WinActive("ahk_class SunAwtFrame")) { 
+  ; force off for various programs, mainly emacs
+  if (WinActive("ahk_class Emacs") || WinActive("ahk_class Console_2_Main") || WinActive("ahk_class PuTTY") || WinActive("ahk_class SunAwtFrame") || WinActive("ahk_class VirtualConsoleClass")) {
     return false
   }
+  ; default to true
   return true
 }
 
 IsInEmacsMode() {
   global EmacsModeStat
-  if (EmacsModeStat && is_target()) {
+if (EmacsModeStat && is_target()) {
     return true
   } else {
     return false
@@ -100,8 +118,8 @@ kill_line() {
   ;{
   ;  Send ^o
   ;}
-  
-  
+
+
   global is_pre_spc = 0
   Return
 }
@@ -229,7 +247,7 @@ next_line() {
 backward_char() {
   global
   if is_pre_spc
-    Send +{Left} 
+    Send +{Left}
   Else
     Send {Left}
   Return
@@ -253,39 +271,64 @@ scroll_down() {
   Return
 }
 
+backward_word() {
+  global
+  if is_pre_spc
+    Send +^{Left}
+  Else
+    Send ^{Left}
+  Return
+}
+
+forward_word() {
+  global
+  if is_pre_spc
+    Send +^{Right}
+  Else
+    Send ^{Left}
+  Return
+}
+
 singleLetterFallbackToDefault() {
-  state := GetKeyState("Capslock", "T") 
-  If(state) {
-    Send +%A_ThisHotkey%  ; + for upper case 
+  state := GetKeyState("Capslock", "T")
+  If(state)
+  {
+    Send +%A_ThisHotkey%  ; + for upper case
   }
-  Else {
-    Send %A_ThisHotkey%
+  Else
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
   }
 }
 
 ;==========================
 ;Keybindings
 ;==========================
-^x::
+>^x::
   If IsInEmacsMode() {
     global is_pre_x = 1
     SetTimer, KeyX, 1000
   }
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
 
 h::
   If (IsInEmacsMode() && is_pre_x) {
-    Send ^a  ; select all 
+    Send ^a  ; select all
     global is_pre_x = 0
   }
   Else
     singleLetterFallbackToDefault()
   Return
 
-^f::
-  If IsInEmacsMode() {
+>^f::
+  If IsInEmacsMode()
+  {
     If is_pre_x {
       Send ^o
       global is_pre_x = 0
@@ -295,53 +338,88 @@ h::
       Else
         Send {Right}
     }
-  } Else
-    Send %A_ThisHotkey%
+  }
+  Else
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-  
-^d::
+
++>^f::
+  If IsInEmacsMode()
+      Send +{Right}
+  Else
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
+  Return
+
+>^d::
   If IsInEmacsMode()
     delete_char()
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-^k::
+>^k::
   If IsInEmacsMode()
     kill_line()
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-^o::
+>^o::
   If IsInEmacsMode()
     open_line()
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-^g::
+>^g::
   If IsInEmacsMode()
     quit()
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-^j::
+>^j::
   If IsInEmacsMode()
     newline_and_indent()
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-^m::
+>^m::
   If IsInEmacsMode()
     newline()
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-^i::
+>^i::
   If IsInEmacsMode()
     indent_for_tab_command()
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-^s::
+>^s::
   If IsInEmacsMode()
   {
     If is_pre_x
@@ -350,33 +428,48 @@ h::
       isearch_forward()
   }
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-^r::
+>^r::
   If IsInEmacsMode()
     isearch_backward()
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-^w::
+>^w::
   If IsInEmacsMode()
     kill_region()
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-^y::
+>^y::
   If IsInEmacsMode()
     yank()
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-^/::
+>^/::
   If IsInEmacsMode()
     undo()
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-^@::
+>^Space::
   If IsInEmacsMode()
   {
     If is_pre_spc
@@ -385,52 +478,199 @@ h::
       is_pre_spc = 1
   }
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send ^{Space}
+  }
   Return
-^a::
+>^a::
   If IsInEmacsMode()
     move_beginning_of_line()
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-^e::
++>^a::
+  If IsInEmacsMode()
+  {
+    is_pre_spc = 1
+    move_beginning_of_line()
+    is_pre_spc = 0
+  }
+  Else
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
+  Return
+>^e::
   If IsInEmacsMode()
     move_end_of_line()
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-^p::
++>^e::
+  If IsInEmacsMode()
+  {
+    is_pre_spc = 1
+    move_end_of_line()
+    is_pre_spc = 0
+  }
+  Else
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
+  Return
+>^p::
   If IsInEmacsMode()
     previous_line()
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-^n::
++>^p::
+  If IsInEmacsMode()
+  {
+    is_pre_spc = 1
+    previous_line()
+    is_pre_spc = 0
+  }
+  Else
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
+  Return
+>^n::
   If IsInEmacsMode()
     next_line()
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-^b::
++>^n::
+  If IsInEmacsMode()
+  {
+    is_pre_spc = 1
+    next_line()
+    is_pre_spc = 0
+  }
+  Else
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
+  Return
+>^b::
   If IsInEmacsMode()
     backward_char()
   Else
-    Send %A_ThisHotkey%
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
   Return
-; page scroll are commented out 
-;^v::
-;  If IsInEmacsMode()
-;    scroll_down()
-;  Else
-;    Send %A_ThisHotkey%
-;  Return
-;!v::
-;  If IsInEmacsMode()
-;    scroll_up()
-;  Else
-;    Send %A_ThisHotkey%
-;  Return
++>^b::
+  If IsInEmacsMode()
+  {
+    is_pre_spc = 1
+    backward_char()
+    is_pre_spc = 0
+  }
+  Else
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
+  Return
+>^!w::
+  If IsInEmacsMode()
+    kill_ring_save()
+  Else
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
+  Return
 
+; page scroll are commented out
+>^v::
+  If IsInEmacsMode()
+   scroll_down()
+  Else
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
+  Return
+
+>^!v::
+  If IsInEmacsMode()
+   scroll_up()
+  Else
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
+  Return
+
+>^!f::
+  If IsInEmacsMode()
+   forward_word()
+  Else
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
+  Return
+
++>^!f::
+  If IsInEmacsMode()
+  {
+   is_pre_spc=1
+   forward_word()
+   is_pre_spc=0
+  }
+  Else
+  {
+   StringReplace, hotkey, A_ThisHotkey, >
+   Send %hotkey%
+  }
+  Return
+
+>^!b::
+  If IsInEmacsMode()
+    backward_word()
+  Else
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
+  Return
+
++>^!b::
+  If IsInEmacsMode()
+  {
+    is_pre_spc = 1
+    backward_word()
+    is_pre_spc = 0
+  }
+  Else
+  {
+    StringReplace, hotkey, A_ThisHotkey, >
+    Send %hotkey%
+  }
+  Return
 
 ;==========================
 ;Original
@@ -450,38 +690,42 @@ SendCommand(emacsKey, translationToWindowsKeystrokes, secondWindowsKeystroke="")
 ;Word Navigation
 ;==========================
 
-$!p::SendCommand("!p","^{Up}")
+;$>^!p::SendCommand("!p","^{Up}")
 
-$!n::SendCommand("!n","^{Down}")
+;$>^!n::SendCommand("!n","^{Down}")
 
-$!f::SendCommand("!f","^{Right}")
+;$>^!f::SendCommand("!f","^{Right}")
 
-$!b::SendCommand("!b","^{Left}")
+;$+>^!f::SendCommand("+!f","+^{Right}")
+
+;$>^!b::SendCommand("!b","^{Left}")
+
+;$+>^!b::SendCommand("+!b","+^{Left}")
 
 ;==========================
 ;Page Navigation
 ;==========================
-$!<::SendCommand("!<","^{Home}")
+$>^!<::SendCommand("!<","^{Home}")
 
-$!>::SendCommand("!>","^{End}")
+$>^!>::SendCommand("!>","^{End}")
 
 ;==========================
 ;Undo
 ;==========================
 
-$^_::SendCommand("^_","^z")
+$>^_::SendCommand("^_","^z")
 
 ;==========================
 ;Delete
 ;==========================
-$!d::SendCommand("!d","^+{Right}","{Delete}")
+$>^!d::SendCommand("!d","^+{Right}","{Delete}")
 
 
 
 ;==========================
 ;Disable Win Key but not its combinations
 ;==========================
-~LWin Up:: return
+; ~LWin Up:: return
 
 ;==========================
 ;Auto Save
@@ -502,15 +746,15 @@ $!d::SendCommand("!d","^+{Right}","{Delete}")
 ;==========================
 ; Mac Key bindings
 ;==========================
-!w::Send {LCtrl Down}{w}{LCtrl Up}  ; emacs kill_ring_save()
-!t::Send {LCtrl Down}{t}{LCtrl Up}
-!c::Send {LCtrl Down}{c}{LCtrl Up}
-!v::Send {LCtrl Down}{v}{LCtrl Up}
-!l::Send {LCtrl Down}{l}{LCtrl Up}
-!q::Send {LAlt Down}{f4}{LAlt Up}
-!a::Send {LCtrl Down}{a}{LCtrl Up}
-!s::Send {LCtrl Down}{s}{LCtrl Up}
-!z::Send {LCtrl Down}{z}{LCtrl Up}
-!r::Send {LCtrl Down}{r}{LCtrl Up}
-!LButton::Send {LCtrl Down}{LButton}{LCtrl Up}
-!RButton::Send {LCtrl Down}{RButton}{LCtrl Up}
+; !w::Send {LCtrl Down}{w}{LCtrl Up}  ; emacs kill_ring_save()
+; !t::Send {LCtrl Down}{t}{LCtrl Up}
+; !c::Send {LCtrl Down}{c}{LCtrl Up}
+; !v::Send {LCtrl Down}{v}{LCtrl Up}
+; !l::Send {LCtrl Down}{l}{LCtrl Up}
+; !q::Send {LAlt Down}{f4}{LAlt Up}
+; !a::Send {LCtrl Down}{a}{LCtrl Up}
+; !s::Send {LCtrl Down}{s}{LCtrl Up}
+; !z::Send {LCtrl Down}{z}{LCtrl Up}
+; !r::Send {LCtrl Down}{r}{LCtrl Up}
+; !LButton::Send {LCtrl Down}{LButton}{LCtrl Up}
+; !RButton::Send {LCtrl Down}{RButton}{LCtrl Up}
