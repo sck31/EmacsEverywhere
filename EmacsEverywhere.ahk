@@ -285,7 +285,7 @@ forward_word() {
   if is_pre_spc
     Send +^{Right}
   Else
-    Send ^{Left}
+    Send ^{Right}
   Return
 }
 
